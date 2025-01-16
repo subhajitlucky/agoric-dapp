@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-
 import './App.css';
 import {
   makeAgoricChainStorageWatcher,
@@ -11,12 +10,8 @@ import {
   suggestChain,
 } from '@agoric/web-components';
 import { subscribeLatest } from '@agoric/notifier';
-import { makeCopyBag } from '@agoric/store';
-import { Logos } from './components/Logos';
-import { Inventory } from './components/Inventory';
-import { Trade } from './components/Trade';
 
-const { entries, fromEntries } = Object;
+const { fromEntries } = Object;
 
 type Wallet = Awaited<ReturnType<typeof makeAgoricWalletConnection>>;
 
@@ -26,14 +21,9 @@ const ENDPOINTS = {
 };
 
 const codeSpaceHostName = import.meta.env.VITE_HOSTNAME;
-
 const codeSpaceDomain = import.meta.env
   .VITE_GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
 
-if (codeSpaceHostName) {
-  ENDPOINTS.API = `https://${codeSpaceHostName}-1317.${codeSpaceDomain}`;
-  ENDPOINTS.RPC = `https://${codeSpaceHostName}-26657.${codeSpaceDomain}`;
-}
 if (codeSpaceHostName && codeSpaceDomain) {
   ENDPOINTS.API = `https://${codeSpaceHostName}-1317.${codeSpaceDomain}`;
   ENDPOINTS.RPC = `https://${codeSpaceHostName}-26657.${codeSpaceDomain}`;
@@ -42,11 +32,12 @@ if (codeSpaceHostName && codeSpaceDomain) {
     'Missing environment variables: VITE_HOSTNAME or VITE_GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN',
   );
 }
+
 const watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, 'agoriclocal');
 
 interface AppState {
   wallet?: Wallet;
-  offerUpInstance?: unknown;
+  donationInstance?: unknown;
   brands?: Record<string, unknown>;
   purses?: Array<Purse>;
 }
@@ -58,9 +49,13 @@ const setup = async () => {
     [Kind.Data, 'published.agoricNames.instance'],
     instances => {
       console.log('got instances', instances);
-      useAppStore.setState({
-        offerUpInstance: instances.find(([name]) => name === 'offerUp')!.at(1),
-      });
+      // Look for the donation instance
+      const donationInstance = instances.find(([name]) => name === 'donation')?.[1];
+      if (donationInstance) {
+        useAppStore.setState({ donationInstance });
+      } else {
+        console.error('Donation instance not found in agoricNames.');
+      }
     },
   );
 
@@ -91,38 +86,36 @@ const connectWallet = async () => {
   }
 };
 
-const makeOffer = (giveValue: bigint, wantChoices: Record<string, bigint>) => {
-  const { wallet, offerUpInstance, brands } = useAppStore.getState();
-  if (!offerUpInstance) {
-    alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
-    throw Error('no contract instance');
+const makeDonation = (donationAmount: bigint) => {
+  const { wallet, donationInstance, brands } = useAppStore.getState();
+  if (!donationInstance) {
+    alert('No donation contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
+    throw Error('no donation contract instance');
   }
-  if (!(brands && brands.IST && brands.Item)) {
-    alert('Brands not available');
-    throw Error('brands not available');
+  if (!(brands && brands.IST)) {
+    alert('IST brand not available');
+    throw Error('IST brand not available');
   }
 
-  const value = makeCopyBag(entries(wantChoices));
-  const want = { Items: { brand: brands.Item, value } };
-  const give = { Price: { brand: brands.IST, value: giveValue } };
+  const give = { Price: { brand: brands.IST, value: donationAmount } };
 
   wallet?.makeOffer(
     {
       source: 'contract',
-      instance: offerUpInstance,
-      publicInvitationMaker: 'makeTradeInvitation',
+      instance: donationInstance,
+      publicInvitationMaker: 'makeDonationInvitation',
     },
-    { give, want },
+    { give },
     undefined,
     (update: { status: string; data?: unknown }) => {
       if (update.status === 'error') {
-        alert(`Offer error: ${update.data}`);
+        alert(`Donation error: ${update.data}`);
       }
       if (update.status === 'accepted') {
-        alert('Offer accepted');
+        alert('Donation accepted! Thank you for your contribution.');
       }
       if (update.status === 'refunded') {
-        alert('Offer rejected');
+        alert('Donation rejected. Please try again.');
       }
     },
   );
@@ -138,13 +131,12 @@ function App() {
     purses,
   }));
   const istPurse = purses?.find(p => p.brandPetname === 'IST');
-  const itemsPurse = purses?.find(p => p.brandPetname === 'Item');
 
   const tryConnectWallet = () => {
     connectWallet().catch(err => {
       switch (err.message) {
         case 'KEPLR_CONNECTION_ERROR_NO_SMART_WALLET':
-          alert('no smart wallet at that address');
+          alert('No smart wallet found at that address.');
           break;
         default:
           alert(err.message);
@@ -154,22 +146,15 @@ function App() {
 
   return (
     <>
-      <Logos />
-      <h1>Items Listed on Offer Up</h1>
-
+      <h1>Donation Page</h1>
       <div className="card">
-        <Trade
-          makeOffer={makeOffer}
-          istPurse={istPurse as Purse}
-          walletConnected={!!wallet}
-        />
-        <hr />
         {wallet && istPurse ? (
-          <Inventory
-            address={wallet.address}
-            istPurse={istPurse}
-            itemsPurse={itemsPurse as Purse}
-          />
+          <>
+            <h2>Make a Donation</h2>
+            <button onClick={() => makeDonation(1000000n)}>Donate 1 IST</button>
+            <button onClick={() => makeDonation(5000000n)}>Donate 5 IST</button>
+            <button onClick={() => makeDonation(10000000n)}>Donate 10 IST</button>
+          </>
         ) : (
           <button onClick={tryConnectWallet}>Connect Wallet</button>
         )}

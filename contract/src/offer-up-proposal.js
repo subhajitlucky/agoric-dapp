@@ -22,7 +22,7 @@ const CENT = IST_UNIT / 100n;
  */
 
 /**
- * Make a storage node for auxilliary data for a value on the board.
+ * Make a storage node for auxiliary data for a value on the board.
  *
  * @param {ERef<StorageNode>} chainStorage
  * @param {string} boardId
@@ -51,17 +51,17 @@ const publishBrandInfo = async (chainStorage, board, brand) => {
  *
  * @param {BootstrapPowers} permittedPowers
  */
-export const startOfferUpContract = async permittedPowers => {
-  console.error('startOfferUpContract()...');
+export const startDonationContract = async permittedPowers => {
+  console.error('startDonationContract()...');
   const {
     consume: { board, chainStorage, startUpgradable, zoe },
     brand: {
       consume: { IST: istBrandP },
-      produce: { Item: produceItemBrand },
+      produce: { Donation: produceDonationBrand },
     },
     issuer: {
       consume: { IST: istIssuerP },
-      produce: { Item: produceItemIssuer },
+      produce: { Donation: produceDonationIssuer },
     },
     installation: {
       consume: { offerUp: offerUpInstallationP },
@@ -74,21 +74,20 @@ export const startOfferUpContract = async permittedPowers => {
   const istIssuer = await istIssuerP;
   const istBrand = await istBrandP;
 
-  const terms = { tradePrice: AmountMath.make(istBrand, 25n * CENT) };
+  const terms = { donationPrice: AmountMath.make(istBrand, 25n * CENT) };
 
-  // agoricNames gets updated each time; the promise space only once XXXXXXX
   const installation = await offerUpInstallationP;
 
   const { instance } = await E(startUpgradable)({
     installation,
     issuerKeywordRecord: { Price: istIssuer },
-    label: 'offerUp',
+    label: 'donation',
     terms,
   });
   console.log('CoreEval script: started contract', instance);
   const {
-    brands: { Item: brand },
-    issuers: { Item: issuer },
+    brands: { Donation: brand },
+    issuers: { Donation: issuer },
   } = await E(zoe).getTerms(instance);
 
   console.log('CoreEval script: share via agoricNames:', brand);
@@ -96,18 +95,18 @@ export const startOfferUpContract = async permittedPowers => {
   produceInstance.reset();
   produceInstance.resolve(instance);
 
-  produceItemBrand.reset();
-  produceItemIssuer.reset();
-  produceItemBrand.resolve(brand);
-  produceItemIssuer.resolve(issuer);
+  produceDonationBrand.reset();
+  produceDonationIssuer.reset();
+  produceDonationBrand.resolve(brand);
+  produceDonationIssuer.resolve(issuer);
 
   await publishBrandInfo(chainStorage, board, brand);
-  console.log('offerUp (re)started');
+  console.log('donation (re)started');
 };
 
 /** @type {BootstrapManifest} */
 const offerUpManifest = {
-  [startOfferUpContract.name]: {
+  [startDonationContract.name]: {
     consume: {
       agoricNames: true,
       board: true, // to publish boardAux info for NFT brand
@@ -116,8 +115,8 @@ const offerUpManifest = {
       zoe: true, // to get contract terms, including issuer/brand
     },
     installation: { consume: { offerUp: true } },
-    issuer: { consume: { IST: true }, produce: { Item: true } },
-    brand: { consume: { IST: true }, produce: { Item: true } },
+    issuer: { consume: { IST: true }, produce: { Donation: true } },
+    brand: { consume: { IST: true }, produce: { Donation: true } },
     instance: { produce: { offerUp: true } },
   },
 };
