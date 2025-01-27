@@ -4,7 +4,7 @@ The **Decentralized Scholarship Ledger** is a blockchain-based application built
 
 Users can explore available scholarships, apply for them with ease, and track the status of their applications. Upon successful approval and confirmation of transactions, the scholarship amount is directly credited to the beneficiary’s account.
 
-![Decentralized Scholarship Ledger](https://docs.agoric.com/assets/new_002_small2.DgAL2zV8.png)
+
 
 ---
 
